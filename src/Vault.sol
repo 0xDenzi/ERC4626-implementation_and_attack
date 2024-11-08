@@ -11,13 +11,7 @@ using SafeERC20 for IERC20;
 
 contract Vault is ERC4626 {
 
-    uint256 constant public FEE = 200;
-    uint256 constant public FEE_DENOMINATOR = 10000;
-
-    uint256 private collectedFees = 0;
-
     address public underlyingToken;
-
     address public owner;
 
     event FeesCollected(uint256 amount);
@@ -31,12 +25,13 @@ contract Vault is ERC4626 {
     }
     
     function totalAssets() public view virtual override returns (uint256) {
-        return IERC20(asset()).balanceOf(address(this)) - collectedFees;
+        return IERC20(asset()).balanceOf(address(this));
     }
 
-    function _calculateFee(uint256 amount) internal pure returns(uint256) {
-        return (amount * FEE) / FEE_DENOMINATOR;
+    function checkShares() public view virtual returns (uint256) {
+        return balanceOf(_msgSender());
     }
+
     function deposit(
         uint256 assets,
         address receiver
@@ -49,14 +44,10 @@ contract Vault is ERC4626 {
         if (assets > maxAssets) {
             revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
         }
-        
-        uint256 fee = _calculateFee(assets);
-        uint256 assetsAfterFee = assets - fee;
-        collectedFees += fee;
 
-        uint256 shares = previewDeposit(assetsAfterFee);
+        uint256 shares = previewDeposit(assets);
 
-        _deposit(_msgSender(), receiver, assetsAfterFee, shares);
+        _deposit(_msgSender(), receiver, assets, shares);
 
         return shares;
     }
@@ -70,12 +61,6 @@ contract Vault is ERC4626 {
         uint256 maxAssets = maxWithdraw(account);
         if (assets > maxAssets) {
             revert ERC4626ExceededMaxWithdraw(account, assets, maxAssets);
-        }
-
-        if (collectedFees >= 10e17) {
-            IERC20(underlyingToken).safeTransfer(owner, collectedFees);
-            emit FeesCollected(collectedFees);
-            collectedFees = 0;
         }
 
         uint256 shares = previewWithdraw(assets);
