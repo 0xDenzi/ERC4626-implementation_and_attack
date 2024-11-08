@@ -68,4 +68,16 @@ contract Vault is ERC4626 {
 
         return shares;
     }
+
+    function redeem(uint256 shares, address receiver, address account) public virtual override returns (uint256) {
+        uint256 maxShares = maxRedeem(account);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxRedeem(account, shares, maxShares);
+        }
+
+        uint256 assets = previewRedeem(shares);
+        _withdraw(_msgSender(), receiver, account, assets, shares);
+
+        return assets;
+    }
 }
